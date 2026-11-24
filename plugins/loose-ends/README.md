@@ -9,6 +9,8 @@ Install in Claude Code:
 /plugin install loose-ends@loose-ends
 ```
 
+The second command opens the plugin's page: choose **Install for you (user scope)**, then start a new session (or run `/reload-plugins`).
+
 - **At session start:** one line, e.g. "Loose Ends: 4 conversations are waiting on you (1 in this project)". Shown again only after 3 hours or when the count changes.
 - **`/loose-ends:scan`:** the list with ids (`--all` adds optional "want me to also…?" offers).
 - **`/loose-ends:brief <id>`:** where it stopped, what's waiting on you, links you shared, and the `claude --resume` command.

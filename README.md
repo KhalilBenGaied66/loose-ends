@@ -17,6 +17,13 @@ Loose Ends finds the Claude Code conversations that are waiting on *you*: a ques
 /plugin install loose-ends@loose-ends
 ```
 
+The second command opens the plugin's page instead of installing straight away. On that page, choose **Install for you (user scope)** and press Enter. Then start a new session, or run `/reload-plugins`.
+
+Other ways to install:
+
+- **From a terminal, with no menus:** `claude plugin marketplace add KhalilBenGaied66/loose-ends`, then `claude plugin install loose-ends@loose-ends`. It loads the next time you start Claude Code.
+- **Claude desktop app (Code tab):** its plugin browser (**+** > **Add plugins**) lists only marketplaces that were already added, and it has no box for adding a GitHub one. Add it once with the terminal commands above, then restart the app. If `claude` isn't a command in your terminal, paste this into a Code tab session instead: *"Install the Claude Code plugin Loose Ends for me: run `claude plugin marketplace add KhalilBenGaied66/loose-ends`, then `claude plugin install loose-ends@loose-ends`. If `claude` isn't on my PATH, use the Claude Code executable this app runs. Show me the output of both."*
+
 Requires Node.js 18+ on your PATH. Without it, the plugin tells you once what to install and otherwise stays silent: it never shows hook errors.
 
 Want to see it before it reads anything of yours? `node plugins/loose-ends/scripts/loose-ends.mjs demo page` builds made-up sessions in a temp folder and opens the scan page for them (that's the screenshot above).
