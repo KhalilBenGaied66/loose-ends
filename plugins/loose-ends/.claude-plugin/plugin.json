@@ -1,0 +1,11 @@
+{
+  "name": "loose-ends",
+  "version": "0.1.0",
+  "description": "Finds the Claude Code conversations that are waiting on you: unanswered questions, plans you never approved, errors you left. Local, zero tokens, no network.",
+  "author": { "name": "Khalil Ben Gaied", "url": "https://github.com/KhalilBenGaied66" },
+  "homepage": "https://github.com/KhalilBenGaied66/loose-ends",
+  "repository": "https://github.com/KhalilBenGaied66/loose-ends",
+  "license": "MIT",
+  "keywords": ["productivity", "reminders", "sessions", "resume", "local-first"],
+  "network": { "hosts": [] }
+}

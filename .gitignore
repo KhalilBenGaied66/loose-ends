@@ -1,0 +1,6 @@
+node_modules/
+.loose-ends/
+*.log
+.DS_Store
+Thumbs.db
+*.stackdump

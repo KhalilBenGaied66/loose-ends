@@ -1,0 +1,11 @@
+{
+  "name": "loose-ends",
+  "version": "0.1.0",
+  "description": "Finds the AI conversations that are waiting on you. Local, zero tokens, no network.",
+  "type": "module",
+  "bin": { "loose-ends": "plugins/loose-ends/scripts/loose-ends.mjs" },
+  "scripts": { "test": "node --test test/" },
+  "engines": { "node": ">=18" },
+  "license": "MIT",
+  "author": "Khalil Ben Gaied"
+}

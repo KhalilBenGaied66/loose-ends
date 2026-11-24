@@ -1,0 +1,12 @@
+{
+  "name": "loose-ends",
+  "owner": { "name": "Khalil Ben Gaied" },
+  "description": "Loose Ends: find the AI conversations that are waiting on you.",
+  "plugins": [
+    {
+      "name": "loose-ends",
+      "source": "./plugins/loose-ends",
+      "description": "Finds the Claude Code conversations that are waiting on you. Local, zero tokens, no network."
+    }
+  ]
+}
