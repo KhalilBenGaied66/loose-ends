@@ -2,7 +2,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { listSessionFiles, readSession, defaultRoot } from "./reader.mjs";
-import { classify, isLooseEnd } from "./detect.mjs";
+import { classify, isLooseEnd, isDoneTitle } from "./detect.mjs";
+import { desktopSessions } from "./desktop.mjs";
 import { loadJson, saveJson } from "./store.mjs";
 
 const CACHE_V = 3;
@@ -69,10 +70,18 @@ export function scan(o = {}) {
   for (const k of Object.keys(cache.files)) if (!seen.has(k)) { delete cache.files[k]; dirty = true; }
   if (dirty) saveJson("cache.json", cache);
 
+  // Desktop app records: a link to each session, its sidebar title, and whether the user archived it.
+  let desk = o.desktop;
+  if (!desk) { try { desk = desktopSessions(); } catch { desk = new Map(); } }
+
   const items = [];
   const counts = {};
   for (const s of sessions) {
-    const c = classify(s.digest);
+    const dk = desk.get(s.sessionId);
+    if (dk && dk.title) s.title = dk.title;
+    let c = classify(s.digest);
+    // The user already closed it themselves: archived in the app, or titled "… (DONE)".
+    if (c.weight && ((dk && dk.archived) || isDoneTitle(s.title))) c = { state: "closed", kind: "", weight: 0, question: "" };
     counts[c.state] = (counts[c.state] || 0) + 1;
     const st = state.items[s.sessionId];
 
@@ -112,6 +121,7 @@ export function scan(o = {}) {
       lastTs: s.lastTs,
       idleHours: idle / HOUR,
       links: s.digest.links || [],
+      hostId: dk ? dk.hostId : "",
       session: s,
     });
   }

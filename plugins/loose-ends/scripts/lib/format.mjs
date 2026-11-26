@@ -44,13 +44,32 @@ export function formatList(res, { limit = 10 } = {}) {
 }
 
 /** Compact Markdown for the /loose-ends:scan command (this is what costs tokens, so keep it short). */
-export function formatMarkdown(res, { limit = 8 } = {}) {
-  const out = [`**${headline(res.items.length)}** (${res.scanned} sessions scanned locally, 0 tokens)`, ""];
+// Colour is never the only signal: the label is always written out next to the dot.
+const DOT = { decision: "🔴", approval: "🔴", broken: "🔴", question: "🟠", interrupted: "🟠", unanswered: "🟠", your_move: "🟠", half_done: "🔵", promised: "🔵", offer: "🔵" };
+
+const mdText = (t) => String(t).replace(/([\\[\]*_`<>])/g, "\\$1");
+
+/** Markdown link that opens the session in the Claude desktop app, or bold text where links can't work. */
+export function sessionLink(title, hostId, links) {
+  const t = mdText(title);
+  return links && hostId ? `**[${t}](#${hostId})**` : `**${t}**`;
+}
+
+export function formatMarkdown(res, { limit = 8, links = false } = {}) {
+  const n = res.items.length;
+  const out = [`**${headline(n).replace(/\.$/, "")}** · ${res.scanned} sessions checked on this computer, 0 tokens`, ""];
   res.items.slice(0, limit).forEach((it, i) => {
-    out.push(`${i + 1}. \`${it.short}\` **${LABELS[it.kind] || it.kind}** · ${it.project} · ${ago(it.idleHours)}: ${clip(it.title, 70)}`);
+    out.push(`${i + 1}. ${DOT[it.kind] || "🟠"} ${sessionLink(clip(it.title, 70), it.hostId, links)} · ${LABELS[it.kind] || it.kind} · ${it.project} · ${ago(it.idleHours)} · \`${it.short}\``);
     if (it.question) out.push(`   > ${clip(it.question, 140)}`);
   });
-  if (res.items.length > limit) out.push(`…and ${res.items.length - limit} more.`);
+  if (n > limit) out.push(`\n…and ${n - limit} more (\`/loose-ends:scan --limit ${n}\`).`);
+  if (!n) return out.join("\n");
+  const linked = links && res.items.slice(0, limit).some((it) => it.hostId);
+  out.push("");
+  out.push(linked ? "**Click a title** to open that session, or reply with:" : "Reply with:");
+  out.push(`- \`brief 1\`: where it stopped, what it needs from you, and how to ${linked ? "open" : "resume"} it`);
+  out.push("- `done 2 3`: clear the ones you've already finished");
+  out.push("- `snooze 1`: hide one for a day (`snooze 1 7d` for a week)");
   return out.join("\n");
 }
 

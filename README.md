@@ -33,8 +33,8 @@ Want to see it before it reads anything of yours? `node plugins/loose-ends/scrip
 | In Claude Code | What it does |
 |---|---|
 | (automatic) | At session start, one line: *"Loose Ends: 4 conversations are waiting on you (1 in this project)."* Shown again only after 3 hours or when the count changes. |
-| `/loose-ends:scan` | The list, with ids. `--all` also shows optional "want me to also…?" offers. |
-| `/loose-ends:brief <id>` | Where it stopped, what's waiting on you, the links you shared, and the `claude --resume` command. |
+| `/loose-ends:scan` | The numbered list, each with its status. In the Claude desktop app, click a title to open that session. Then reply `brief 1`, `done 2 3` or `snooze 1 7d`. `--all` also shows optional "want me to also…?" offers. |
+| `/loose-ends:brief <number or id>` | A link to open the session (desktop app), where it stopped, what's waiting on you, the links you shared, and the `claude --resume` command. |
 | `/loose-ends:page` | Opens a local scan page in your browser with copy buttons. |
 
 The same tool works from any terminal, with 0 tokens:
@@ -43,7 +43,7 @@ The same tool works from any terminal, with 0 tokens:
 node plugins/loose-ends/scripts/loose-ends.mjs            # list
 node plugins/loose-ends/scripts/loose-ends.mjs brief 41972fa0
 node plugins/loose-ends/scripts/loose-ends.mjs done 41972fa0
-node plugins/loose-ends/scripts/loose-ends.mjs snooze 41972fa0 3
+node plugins/loose-ends/scripts/loose-ends.mjs snooze 41972fa0 3d   # numbers from the last list work too: done 2 3
 node plugins/loose-ends/scripts/loose-ends.mjs rate 41972fa0 up     # still open / down = false alarm / handled = dealt with elsewhere
 node plugins/loose-ends/scripts/loose-ends.mjs stats
 ```
@@ -81,6 +81,8 @@ Known gap: all 3 "handled elsewhere" items had been finished in a *different* se
 The tool measures itself locally from day one: `stats` reports how many flagged loose ends you picked back up (and how many within 48 h), plus detector precision and useful-reminder rate from your ratings. Nothing is sent anywhere. Sharing those numbers is up to you.
 
 ## Privacy
+
+In the Claude desktop app, it also reads the start of the app's own session records on your computer (`claude-code-sessions`) for three things only: the link to each session, its sidebar title, and whether you archived it. Archived sessions, and sessions you renamed with "DONE", are never flagged. Set `LOOSE_ENDS_NO_DESKTOP=1` to turn this off.
 
 Loose Ends reads only the end (and the first megabyte) of each session file. Its own data (a cache of short summaries, your done/snooze marks and ratings) lives in `~/.loose-ends` (or `LOOSE_ENDS_HOME`). Delete that folder to reset it. Set `LOOSE_ENDS_QUIET=1` to turn off the session-start line.
 

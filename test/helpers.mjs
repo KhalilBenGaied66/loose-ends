@@ -11,6 +11,7 @@ export function tempEnv() {
   fs.mkdirSync(root, { recursive: true });
   process.env.LOOSE_ENDS_HOME = home;
   process.env.LOOSE_ENDS_CLAUDE_DIR = root;
+  process.env.LOOSE_ENDS_NO_DESKTOP = "1"; // never read the real desktop app's records from tests
   return { base, root, home };
 }
 

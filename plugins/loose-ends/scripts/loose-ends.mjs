@@ -5,7 +5,8 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { scan, findItem, findSession, setItemState, stats } from "./lib/scan.mjs";
 import { classify } from "./lib/detect.mjs";
-import { formatList, formatMarkdown, buildBrief, estimateTokens, headline } from "./lib/format.mjs";
+import { formatList, formatMarkdown, buildBrief, estimateTokens, headline, sessionLink } from "./lib/format.mjs";
+import { desktopSessions, inDesktopApp } from "./lib/desktop.mjs";
 import { renderPage } from "./lib/page.mjs";
 import { home, loadJson, saveJson } from "./lib/store.mjs";
 import { buildDemo } from "./lib/demo.mjs";
@@ -18,9 +19,10 @@ const HELP = `loose-ends: find AI conversations that are waiting on you (local, 
       --idle H                 only sessions idle at least H hours (default 6)
       --days D                 ignore sessions older than D days (default 30)
       --md | --json            Markdown (for Claude) or JSON output
-  loose-ends brief <id>        resume brief to paste into a new chat
-  loose-ends done <id>         mark as handled (comes back if the session gets new activity)
-  loose-ends snooze <id> [d]   hide for d days (default 1)
+  loose-ends brief <n|id>      resume brief to paste into a new chat
+  loose-ends done <n|id>…      mark as handled (comes back if the session gets new activity)
+  loose-ends snooze <n|id>… [Nd]
+                               hide for N days (default 1), e.g. "snooze 2 4 7d"
   loose-ends rate <id> up|down|handled
                                still open / false alarm / already dealt with elsewhere (local stats only)
   loose-ends stats             resume rate and reminder precision
@@ -28,7 +30,7 @@ const HELP = `loose-ends: find AI conversations that are waiting on you (local, 
   loose-ends demo [page]       try it on made-up sessions (nothing of yours is read)
   loose-ends hook              session-start hook for Claude Code (prints one line, never fails)
 
-<id> is the 8-character id shown in the list (any unique prefix works).
+<n> is an item number from the last list; <id> is the 8-character id (any unique prefix works).
 Data: ${home()}`;
 
 function parseArgs(argv) {
@@ -71,12 +73,29 @@ function fail(msg, code) {
   process.exit(code);
 }
 
+// "brief 2" / "done 3 5": item numbers from the last list shown.
+function fromNumber(t) {
+  if (!/^\d{1,2}$/.test(String(t))) return null;
+  const list = loadJson("state.json", { items: {} }).lastList || [];
+  const id = list[Number(t) - 1];
+  if (!id) fail(`There's no item ${t} in the last list. Run /loose-ends:scan (or "loose-ends") again.`, 1);
+  return id;
+}
+
 function needId(id, cmd) {
-  if (!id) fail(`Usage: loose-ends ${cmd} <id>. Run "loose-ends" (or /loose-ends:scan) to see the ids.`, 2);
+  if (!id) fail(`Usage: loose-ends ${cmd} <number or id>. Run "loose-ends" (or /loose-ends:scan) to see the list.`, 2);
+  id = fromNumber(id) || id;
   const s = resolve(id);
   if (!s) fail(`No session starts with "${id}". Run "loose-ends" (or /loose-ends:scan) to see the ids.`, 1);
   if (s.ambiguous) fail(`"${id}" matches ${s.ambiguous.length} sessions; use more characters.`, 1);
   return s;
+}
+
+/** Item numbers and id prefixes after the command ("done 3 5", "done 41972fa0"), skipping "7d" and the like. */
+function targets(a, cmd) {
+  const list = a._.slice(1).filter((t) => !/^\d+d$/i.test(t));
+  if (!list.length) fail(`Usage: loose-ends ${cmd} <number or id> [more…]. Run "loose-ends" (or /loose-ends:scan) to see the list.`, 2);
+  return list;
 }
 
 function openFile(file) {
@@ -122,29 +141,44 @@ function main() {
   switch (cmd) {
     case "scan": {
       const res = scan(scanOpts(a));
+      const limit = a.limit || (a.md ? 8 : 10);
+      // Remember the order shown, so "brief 2" / "done 3 5" mean what the user just saw.
+      const st = loadJson("state.json", { items: {}, hook: {} });
+      st.lastList = res.items.slice(0, limit).map((i) => i.id);
+      saveJson("state.json", st);
       if (a.json) console.log(JSON.stringify({ ...res, items: res.items.map(({ session, ...i }) => i) }, null, 2));
-      else if (a.md) console.log(formatMarkdown(res, { limit: a.limit || 8 }));
-      else console.log(formatList(res, { limit: a.limit || 10 }));
+      else if (a.md) console.log(formatMarkdown(res, { limit, links: inDesktopApp() }));
+      else console.log(formatList(res, { limit }));
       return;
     }
     case "brief": {
       const s = needId(a._[1], "brief");
       const text = buildBrief(s, classify(s.digest));
+      if (a.md && inDesktopApp()) {
+        let dk; try { dk = desktopSessions().get(s.sessionId); } catch { /* no link then */ }
+        if (dk) console.log(`Open it: ${sessionLink(dk.title || s.title || "this session", dk.hostId, true)}\n`);
+      }
       console.log(text);
       if (!a.md) console.error(`\n(~${estimateTokens(text)} tokens if pasted into a chat)`);
       return;
     }
     case "done": {
-      const s = needId(a._[1], "done");
-      setItemState(s.sessionId, { doneAt: Date.now(), doneLastTs: s.lastTs });
-      console.log(`Marked done: ${s.title || s.firstPrompt.slice(0, 60) || s.sessionId}`);
+      for (const t of targets(a, "done")) {
+        const s = needId(t, "done");
+        setItemState(s.sessionId, { doneAt: Date.now(), doneLastTs: s.lastTs });
+        console.log(`Marked done: ${s.title || s.firstPrompt.slice(0, 60) || s.sessionId}`);
+      }
       return;
     }
     case "snooze": {
-      const s = needId(a._[1], "snooze");
-      const days = Number(a._[2] || 1);
-      setItemState(s.sessionId, { snoozeUntil: Date.now() + days * 86400e3 });
-      console.log(`Snoozed for ${days} day(s).`);
+      // snooze 1 · snooze 2 4 7d · snooze 41972fa0 3d
+      const dayArg = a._.slice(1).find((t) => /^\d+d$/i.test(t));
+      const days = dayArg ? parseInt(dayArg, 10) : 1;
+      for (const t of targets(a, "snooze")) {
+        const s = needId(t, "snooze");
+        setItemState(s.sessionId, { snoozeUntil: Date.now() + days * 86400e3 });
+        console.log(`Snoozed for ${days} day${days === 1 ? "" : "s"}: ${s.title || s.firstPrompt.slice(0, 60) || s.sessionId}`);
+      }
       return;
     }
     case "rate": {

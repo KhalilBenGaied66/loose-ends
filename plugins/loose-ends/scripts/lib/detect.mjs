@@ -10,7 +10,14 @@ const YOUR_MOVE = /\b(your (remaining|next) steps?|you('ll)? (need|have) to|over
 // Assistant greetings in throwaway sessions ("Reply OK" → "What would you like to work on?").
 const GENERIC = /^(what (would you like|can i help|do you want)( me)? (to )?(help with|work on|do)?|how can i help)/i;
 const CLOSED = /^(thanks?( you)?|thx|ty|perfect|great|awesome|amazing|works|it works|done|ok(ay)?|cool|nice|merci|good|got it|all good|that'?s it|bye)\b[\s\S]{0,40}$/i;
-const BROKEN = /(traceback|exception|\berror\b|\bfailed\b|not working|does ?n[o']?t work|isn'?t working|\bbroken\b|\bcrash)/i;
+const THANKS_LEAD = /^(thanks?|thank you|thx|ty|merci|many thanks|much appreciated)\b/i;
+const REQUEST = /\b(can you|could you|would you|please|now (add|make|fix|do|write|change)|add|fix|make|create|change|update|write|build|implement|remove|rename|deploy|install|run)\b/i;
+// The user closed it by renaming: "Phishing triage (DONE)", "DONE for now", "✅ CV update".
+export function isDoneTitle(t) {
+  const s = String(t || "");
+  return /✅|\bDONE\b/.test(s) || /[([]\s*(done|finished|completed|resolved)\b/i.test(s) || /[-–—:|]\s*(done|finished|completed|resolved)\s*[)\]!.]*\s*$/i.test(s);
+}
+const BROKEN =/(traceback|exception|\berror\b|\bfailed\b|not working|does ?n[o']?t work|isn'?t working|\bbroken\b|\bcrash)/i;
 // First person only: "I'll test it tomorrow", "remind me", not "you get paid days later".
 const PROMISE = /\b(remind me|i'?ll come back|come back to (this|it)|i'?ll (check|try|test|look at|review|do|finish|get back to)\b[^.!?\n]{0,40}\b(later|tomorrow|tonight|next week)|(later|tomorrow|tonight) i'?ll)\b/i;
 
@@ -75,8 +82,12 @@ export function classify(d) {
   const r = (state, kind, question = "") => ({ state, kind, weight: WEIGHTS[kind] || 0, question });
   const lastUser = (d.lastUserText || "").trim();
 
+  // Our own /loose-ends:scan ends with "which one do you want to pick up?" (or got no reply in a test run): never flag it.
+  if (/^\/?loose-ends:/i.test(lastUser)) return r("finished", "");
   if (d.lastKind === "user") {
     if (lastUser.length <= 60 && CLOSED.test(lastUser)) return r("closed", "");
+    // A longer sign-off: "Thank you so much for your support, I'll follow your plan…" (no question, no new request).
+    if (THANKS_LEAD.test(lastUser) && !lastUser.includes("?") && !REQUEST.test(lastUser) && !BROKEN.test(lastUser)) return r("closed", "");
     if (BROKEN.test(lastUser)) return r("broken", "broken", lastUser.slice(0, 200));
     return r("unanswered", "unanswered", lastUser.slice(0, 200));
   }
@@ -85,8 +96,6 @@ export function classify(d) {
   if (d.lastKind === "tool_result" || d.lastKind === "tool_use") return r("interrupted", "interrupted", "The session ended in the middle of a task");
 
   // The AI spoke last.
-  // Our own /loose-ends:scan ends with "which one do you want to pick up?": never flag the scan itself.
-  if (/^\/?loose-ends:/i.test(lastUser)) return r("finished", "");
   if (d.pendingAsk) {
     const q = d.pendingAsk.text;
     const kind = d.pendingAsk.source === "ask_tool" ? "decision" : d.pendingAsk.source === "plan" ? "approval" : kindOfQuestion(q) === "offer" ? "approval" : kindOfQuestion(q);
